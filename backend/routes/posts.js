@@ -1,5 +1,5 @@
 const express=require('express')
-
+const checkAuth=require('../middleware/check-auth')
 const router=express.Router()
 const Post=require('../models/post');
 const app = require('../app');
@@ -35,21 +35,26 @@ const MIME_TYPE_MAP = {
 
 
 
-router.post("",multer({ storage: storage }).single("image"),(req,res,next)=>{
+router.post("",checkAuth,multer({ storage: storage }).single("image"),(req,res,next)=>{
 
     const url=req.protocol+"://"+req.get('host');
     const post=new Post({
         title:req.body.title,
         content:req.body.content,
-        imagePath:url+"/images/"+req.file.filename
+        imagePath:url+"/images/"+req.file.filename,
+        creator:req.userData.userId
     });
+    
     post.save().then((result)=>{
         res.status(201).json({message:"Post successfully created!",post:{
             id:result._id,
             title:result.title,
             content:result.content,
-            imagePath:result.imagePath
+            imagePath:result.imagePath,
+            creator:result.creator
         }});
+    }).catch(err=>{
+        res.status(500).json({message:"Post creation failed!"})
     });
     
    // next();
@@ -58,13 +63,26 @@ router.post("",multer({ storage: storage }).single("image"),(req,res,next)=>{
 
 router.get("",(req,res,next)=>{
 
-   Post.find().then(documents=>{
-
+    const pageSize=+req.query.pageSize;
+    const currPage=+req.query.page;
+    let query=Post.find();
+    let fetchedPosts;
+    if(pageSize && currPage){
+        
+        query=Post.find().skip((currPage-1)*pageSize).limit(pageSize)
+    }
+   query.then(documents=>{
+    fetchedPosts=documents;
+    return Post.countDocuments();
+   }).then(count=>{
     res.status(200).json({
         message:"Successful",
-        posts:documents
+        posts:fetchedPosts,
+        maxPosts:count
     })
-   })
+   }).catch(err=>{
+    res.status(500).json({message:"Fetching posts failed!"})
+});
    
 })
 
@@ -78,34 +96,46 @@ router.get("/:id",(req,res,next)=>{
                 post
             )
         }
-    })
+    }).catch(err=>{
+        res.status(500).json({message:"Fetching post failed!"})
+    });
 })
 
-router.put("/:id",multer({ storage: storage }).single("image"),(req,res,next)=>{
+router.put("/:id",checkAuth,multer({ storage: storage }).single("image"),(req,res,next)=>{
     
     let imagePath=req.body.image;
     if(req.file){
         const url=req.protocol+"://"+req.get('host');
         imagePath=url+"/images/"+req.file.filename
     }
-    Post.updateOne({_id:req.params.id},{_id:req.body.id,title:req.body.title,content:req.body.content,  imagePath: imagePath}).then(()=>{
+    Post.updateOne({_id:req.params.id,creator:req.userData.userId},{_id:req.body.id,title:req.body.title,content:req.body.content,  imagePath: imagePath}).then((result)=>{
+        if(result.nModified>0){
         res.status(200).json({
             message:"Post updated successfully! "+imagePath,
-            post:{id:req.body.id,title:req.body.title,content:req.body.content,imagePath:imagePath}
+            post:{id:req.body.id,title:req.body.title,content:req.body.content,imagePath:imagePath,creator:req.userData.userId}
         })
-    })
+    }
+    else{
+        res.status(401).json({message:"Unauthorized"});
+    }
+    }).catch(err=>{
+        res.status(500).json({message:"Couldn't updated post!"})
+    });
 })
 
-router.delete("/:id",(req,res,next)=>{
+router.delete("/:id",checkAuth,(req,res,next)=>{
     
-   Post.deleteOne({_id:req.params.id}).then(()=>{
-
-       res.status(201).json({
-           message:"Post deleted successfully!"
-       })
-   }).catch(()=>{
-       console.log("Error in delete endpoint!")
-   })
+   Post.deleteOne({_id:req.params.id,creator:req.userData.userId}).then((result)=>{
+        
+       if(result.n>0){
+        res.status(201).json({
+            message:"Post deleted successfully!"
+        })
+       }
+       res.status(401).json({message:"Unauthorized"});
+   }).catch(err=>{
+    res.status(500).json({message:"Deleting post failed!"})
+});
     
  })
 

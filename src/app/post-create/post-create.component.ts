@@ -33,10 +33,11 @@ export class PostCreateComponent implements OnInit{
         this.mode='edit';
         this.postId=paramMap.get('postId');
         this.isLoading=true;
+        
         this.postsService.getPost(this.postId).subscribe((post)=>{
-          this.post={id:post._id,title:post.title,content:post.content,imagePath:post.imagePath};
+          this.post={id:post._id,title:post.title,content:post.content,imagePath:post.imagePath,creator:post.creator};
           this.isLoading=false;
-          console.log(post)
+          
           this.form.setValue({title:this.post.title,content:this.post.content,image:this.post.imagePath})
         });
         

@@ -3,6 +3,9 @@
     <span ><a routerLink="/">Social Media</a></span>
     <span id="spacer"></span>
     <ul>
-        <li><a routerLink="/create" mat-button routerLinkActive="mat-accent">Create Post</a></li> 
+        <li><a routerLink="/create" mat-button routerLinkActive="mat-accent" *ngIf="isUserAuthenticated">Create Post</a></li>
+        <li><a routerLink="/login" mat-button routerLinkActive="mat-accent" *ngIf="!isUserAuthenticated">Login</a></li> 
+        <li><a routerLink="/signup" mat-button routerLinkActive="mat-accent" *ngIf="!isUserAuthenticated">Signup</a></li> 
+        <li><button *ngIf="isUserAuthenticated" mat-button (click)="logOut()">Logout</button></li>
     </ul>
 </mat-toolbar>
